@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>NIT Trichy Buggy Web Map</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <style>
+        html, body, #map { height:100%; margin:0; padding:0; }
+        .topbar {
+          position: absolute; left:10px; top:10px; z-index:1000;
+          background: rgba(0,0,0,0.45); color:white;
+          padding:8px 12px; border-radius:8px;
+          font-size:14px;
+          backdrop-filter: blur(3px);
+        }
+        .nearest-stop { transform: scale(1.3); }
+    </style>
+</head>
+
+<body>
+<div id="map"></div>
+<div class="topbar" id="status">Waiting for UID from app…</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore-compat.js"></script>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+    /*************** FIREBASE CONFIG (Replace) ***************/
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    /*********************************************************/
+
+    const statusEl = document.getElementById("status");
+    const setStatus = t => statusEl.textContent = t;
+
+    /*************** OSM MAP ***************/
+    const map = L.map('map').setView([10.7600, 78.8135], 16);
+
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+    }).addTo(map);
+
+    /*************** NIT TRICHY STOPS ***************/
+    const buggyStops = [
+      { name: 'Lassi Shop', location: [10.761750, 78.814649] },
+      { name: 'Coke Station', location: [10.761701, 78.813969] },
+      { name: 'GJCH', location: [10.761515, 78.811831] },
+      { name: 'Department of Energy and Environment', location: [10.759784, 78.812305] },
+      { name: 'Orion Front', location: [10.759719, 78.811045] },
+      { name: 'Department of Chemical Engineering', location: [10.758623, 78.811988] },
+      { name: 'Ojas', location: [10.760575, 78.808483] },
+      { name: 'Department of Architecture', location: [10.759830, 78.809708] },
+      { name: 'Orion Back', location: [10.759701, 78.810454] },
+      { name: 'Third I + Twinnet', location: [10.761183,80.814282] },
+      { name: 'Logos', location: [10.761034, 78.814223] },
+      { name: 'Classics + CEESAT Ground', location: [10.760368, 78.813970] },
+      { name: 'Capstone', location: [10.759813, 78.814115] },
+      { name: 'Barn Hall', location: [10.759214, 78.814188] },
+      { name: 'Admin Building', location: [10.758778, 78.813191] },
+      { name: 'Admin Building Gate', location: [10.758091, 78.813356] },
+      { name: 'EEE Department', location: [10.758069, 78.814663] },
+      { name: 'Mechanical + MME', location: [10.758133, 78.815789] },
+      { name: 'Central Workshop', location: [10.760230, 78.815786] },
+      { name: 'ECE Department', location: [10.760653, 78.816531] },
+      { name: 'Production Department', location: [10.760930, 78.816508] },
+      { name: 'Lyceum Building', location: [10.760060, 78.817655] },
+      { name: 'CSE Department', location: [10.759950, 78.818516] },
+      { name: 'Agate', location: [10.761820191439163, 78.8154991509259] },
+{ name: 'Garnet A and Garnet B', location: [10.762784197315106, 78.81200397483693] },
+{ name: 'Garnet C', location: [10.762995360090889, 78.81254600747656] },
+{ name: 'Mega Mess 2', location: [10.764627177120556, 78.8131651743623] },
+{ name: 'Amethyst', location: [10.766303500268865, 78.81451722727907] },
+{ name: 'Anapoorna mess and Amber A & B', location: [10.767826228746227, 78.81308136297636] },
+{ name: 'Jasper', location: [10.769508650224616, 78.81780479333487] },
+{ name: 'Sabari Mess and Aquamarine A & B', location: [10.767950856425696, 78.8176685205841] },
+{ name: 'Zircon A,B,C', location: [10.766437995603752, 78.81712882443384] },
+{ name: 'Mega Mess 1', location: [10.765931198921441, 78.8154307282723] },
+{ name: 'CPWD office', location: [10.765260747806485, 78.8171449455854] },
+{ name: 'Sara foods', location: [10.765171002276393, 78.81530175888432] },
+{ name: 'Bru stall and Pearl', location: [10.764126105998558, 78.8154156447789] },
+{ name: 'Ruby', location: [10.764220802264765, 78.81729261831606] },
+{ name: 'Diamond', location: [10.763030275180702, 78.81443611390529] },
+{ name: 'Emerald', location: [10.763129706921545, 78.81641743677193] },
+{ name: 'Jade', location: [10.763194563078569, 78.8178777454143] },
+{ name: 'Beryl', location: [10.761859171863424, 78.81747094878722] },
+{ name: 'Coral', location: [10.761803884263534, 78.81551347372677] },
+{ name: 'Hostel office', location: [10.762332721694602, 78.8143879255767] }
+    ];
+
+    const stopMarkers = [];
+
+    buggyStops.forEach(stop => {
+      const marker = L.marker(stop.location, {
+        icon: L.icon({
+          iconUrl: "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+          iconSize: [30,30]
+        })
+      }).addTo(map);
+
+      marker.bindPopup(`<b>${stop.name}</b>`);
+      stopMarkers.push({ marker, data: stop });
+    });
+
+    function findNearest(lat,lng){
+      let nearest=null, dmin=99999999;
+      stopMarkers.forEach(s=>{
+        const d = map.distance([lat,lng], s.data.location);
+        if(d < dmin){ dmin=d; nearest=s; }
+      });
+      return nearest;
+    }
+
+    /*************** USER REALTIME LISTENER ***************/
+    let CURRENT_UID = null;
+    let userMarker = null;
+    let routeLine = null;
+
+    function updateUser(lat,lng,name){
+      if(userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker([lat,lng], {
+        icon: L.icon({
+          iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+          iconSize: [40,40]
+        })
+      }).addTo(map);
+
+      map.setView([lat,lng],17);
+
+      const n = findNearest(lat,lng);
+
+      stopMarkers.forEach(s=>{
+        s.marker._icon.classList.remove("nearest-stop");
+      });
+      n.marker._icon.classList.add("nearest-stop");
+
+      if(routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline([[lat,lng], n.data.location], {
+        color:"green",
+        weight:4
+      }).addTo(map);
+    }
+
+    /*************** FIRESTORE STREAM ***************/
+    function startListener(){
+      db.collection("users").onSnapshot(snap=>{
+        snap.forEach(doc=>{
+          if(doc.id !== CURRENT_UID) return;
+          const d=doc.data();
+          if(d.lat && d.lng){
+            updateUser(d.lat, d.lng, d.name||doc.id);
+            setStatus("Tracking UID: "+CURRENT_UID);
+          }
+        });
+      });
+    }
+
+    /*************** RECEIVE UID FROM THUNKABLE ***************/
+    window.addEventListener("message",(event)=>{
+      let data = null;
+      try{ data = JSON.parse(event.data); }catch(e){}
+      if(!data) return;
+
+      if(data.uid){
+        CURRENT_UID = data.uid;
+        setStatus("UID received: "+CURRENT_UID);
+        startListener();
+      }
+    });
+
+    window.onload = () => {
+      try {
+        window.parent.postMessage(JSON.stringify({ready:true}),"*");
+      } catch(e){}
+    };
+
+</script>
+</body>
+</html>
