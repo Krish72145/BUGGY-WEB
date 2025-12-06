@@ -2,13 +2,14 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>NIT Trichy Buggy Map — Live Tracking + Routing</title>
+    <title>NIT Trichy Buggy Map</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
     <style>
         html, body, #map { height:100%; margin:0; padding:0; }
-        body { font-family: system-ui, Arial, sans-serif; }
+        body { font-family: Arial, sans-serif; }
 
         .topbar {
           position: absolute; left:12px; top:12px; z-index:1000;
@@ -17,8 +18,15 @@
           font-size:14px; backdrop-filter: blur(4px);
         }
 
-        .nearest-stop { transform: scale(1.25); }
-        .buggy-icon { width: 48px; height: 48px; transform-origin: center; }
+        .nearest-stop {
+           border: 3px solid yellow !important;
+           border-radius: 50%;
+        }
+
+        .buggy-icon { 
+          width: 48px; height: 48px; 
+          transform-origin: center; 
+        }
     </style>
 </head>
 
@@ -34,329 +42,221 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-    /*******************************************
-     *  FIREBASE CONFIG — REPLACE THIS SECTION
-     *******************************************/
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
+/*******************************************
+ *  FIREBASE CONFIG — YOU MUST REPLACE THIS
+ *******************************************/
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/*******************************************
+ *  OPENROUTESERVICE CONFIG
+ *******************************************/
+const ORS_API_KEY = "YOUR_ORS_API_KEY_HERE";
+const ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
+
+/*******************************************/
+const statusEl = document.getElementById("status");
+function setStatus(t){ statusEl.textContent = t; }
+
+/*******************************************
+ *  MAP
+ *******************************************/
+const map = L.map("map").setView([10.7600, 78.8135], 16);
+
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+}).addTo(map);
+
+/*******************************************
+ * STOP ICON (SAFE URL)
+ *******************************************/
+const stopIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
+});
+
+/*******************************************
+ * STOP LIST
+ *******************************************/
+const buggyStops = [
+  { name: 'Lassi Shop', location: [10.761750, 78.814649] },
+  { name: 'Coke Station', location: [10.761701, 78.813969] },
+  { name: 'GJCH', location: [10.761515, 78.811831] },
+];
+
+/*******************************************
+ * CREATE STOP MARKERS
+ *******************************************/
+const stopMarkers = [];
+
+buggyStops.forEach(stop => {
+  const marker = L.marker(stop.location, {icon: stopIcon})
+    .addTo(map)
+    .bindPopup(`<b>${stop.name}</b>`);
+
+  stopMarkers.push({ marker, data: stop });
+});
+
+function findStopByName(n) {
+  return buggyStops.find(s => 
+    s.name.toLowerCase() === n.toLowerCase()
+  );
+}
+
+function findNearestStop(lat,lng) {
+  let min = Infinity, nearest = null;
+  stopMarkers.forEach(m => {
+    const d = map.distance([lat,lng], m.data.location);
+    if (d < min) { min = d; nearest = m; }
+  });
+  return nearest;
+}
+
+/*******************************************
+ * BUGGY MARKERS (LIVE)
+ *******************************************/
+const busIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
+  iconSize: [48,48],
+  iconAnchor: [24,24]
+});
+
+const buggyMarkers = {};
+
+function rotateIcon(marker, heading) {
+  if (marker._icon) {
+    marker._icon.style.transform =
+      `translate(-50%, -50%) rotate(${heading}deg)`;
+  }
+}
+
+function smoothMove(marker, targetLatLng) {
+  const start = marker.getLatLng();
+  const end = L.latLng(targetLatLng);
+  let i = 0, steps = 20;
+
+  function animate() {
+    i++;
+    const lat = start.lat + (end.lat-start.lat)*(i/steps);
+    const lng = start.lng + (end.lng-start.lng)*(i/steps);
+    marker.setLatLng([lat,lng]);
+
+    if (i < steps) requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+db.collection("buggies").onSnapshot(snap => {
+  snap.forEach(doc => {
+    const d = doc.data();
+    if (!d.lat || !d.lng) return;
+
+    if (!buggyMarkers[doc.id]) {
+      buggyMarkers[doc.id] = L.marker([d.lat,d.lng], {icon: busIcon})
+        .addTo(map);
+    } else {
+      smoothMove(buggyMarkers[doc.id], [d.lat, d.lng]);
+    }
+    rotateIcon(buggyMarkers[doc.id], d.heading || 0);
+  });
+});
+
+/*******************************************
+ * USER MARKER
+ *******************************************/
+let userMarker = null;
+function updateUser(lat, lng, name) {
+  if (!userMarker) {
+    userMarker = L.marker([lat,lng], {
+      icon: L.icon({
+        iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+        iconSize: [40,40]
+      })
+    }).addTo(map);
+  } else {
+    smoothMove(userMarker, [lat,lng]);
+  }
+}
+
+/*******************************************
+ * ROUTE FUNCTION (SAFE)
+ *******************************************/
+async function getRoute(from, to) {
+  if (!ORS_API_KEY || ORS_API_KEY === "YOUR_ORS_API_KEY_HERE") {
+    console.warn("ORS key missing, drawing straight line.");
+    return { route: [from, to], distanceKm: 0, durationMin: 0 };
+  }
+
+  try {
+    const url = `${ORS_URL}?api_key=${ORS_API_KEY}&start=${from[1]},${from[0]}&end=${to[1]},${to[0]}`;
+    const res = await fetch(url);
+
+    const data = await res.json();
+    const coords = data.features[0].geometry.coordinates;
+
+    const route = coords.map(c => [c[1], c[0]]);
+    const s = data.features[0].properties.summary;
+
+    return {
+      route,
+      distanceKm: s.distance / 1000,
+      durationMin: s.duration / 60
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+  } catch(e) {
+    console.error("ORS failed:", e);
+    return { route: [from, to], distanceKm: 0, durationMin: 0 };
+  }
+}
 
-    /*******************************************
-     *  OPEN ROUTE SERVICE CONFIG — REPLACE KEY
-     *******************************************/
-    const ORS_API_KEY = "YOUR_ORS_API_KEY_HERE";
-    const ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
+/*******************************************
+ * THUNKABLE MESSAGE LISTENER (WORKS NOW)
+ *******************************************/
+window.addEventListener("message", async evt => {
+  let d = evt.data;
+  if (typeof d === "string") try { d = JSON.parse(d); } catch (_) {}
 
-    /*******************************************/
-    const statusEl = document.getElementById("status");
-    const setStatus = t => statusEl.textContent = t;
+  // Update user location
+  if (d.lat && d.lng) {
+    updateUser(d.lat, d.lng, d.name);
+    const nearest = findNearestStop(d.lat, d.lng);
 
-    /*******************************************
-     *  MAP (OSM)
-     *******************************************/
-    const map = L.map('map').setView([10.7600, 78.8135], 16);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19
+    stopMarkers.forEach(s => 
+      s.marker._icon.classList.remove("nearest-stop")
+    );
+    nearest.marker._icon.classList.add("nearest-stop");
+  }
+
+  // Pickup + drop route
+  if (d.pickup && d.drop) {
+    const p = findStopByName(d.pickup);
+    const q = findStopByName(d.drop);
+    if (!p || !q) return;
+
+    const result = await getRoute(p.location, q.location);
+
+    if (window.routeLine) map.removeLayer(window.routeLine);
+
+    window.routeLine = L.polyline(result.route, {
+      color: "red", weight: 5
     }).addTo(map);
 
-    /*******************************************
-     *  ALL STOPS (FULL LIST)
-     *******************************************/
-    const buggyStops = [
-      { name: 'Lassi Shop', location: [10.761750, 78.814649] },
-      { name: 'Coke Station', location: [10.761701, 78.813969] },
-      { name: 'GJCH', location: [10.761515, 78.811831] },
-      { name: 'Department of Energy and Environment', location: [10.759784, 78.812305] },
-      { name: 'Orion Front', location: [10.759719, 78.811045] },
-      { name: 'Department of Chemical Engineering', location: [10.758623, 78.811988] },
-      { name: 'Ojas', location: [10.760575, 78.808483] },
-      { name: 'Department of Architecture', location: [10.759830, 78.809708] },
-      { name: 'Orion Back', location: [10.759701, 78.810454] },
-      { name: 'Third I + Twinnet', location: [10.761183, 78.814282] },
-      { name: 'Logos', location: [10.761034, 78.814223] },
-      { name: 'Classics + CEESAT Ground', location: [10.760368, 78.813970] },
-      { name: 'Capstone', location: [10.759813, 78.814115] },
-      { name: 'Barn Hall', location: [10.759214, 78.814188] },
-      { name: 'Admin Building', location: [10.758778, 78.813191] },
-      { name: 'Admin Building Gate', location: [10.758091, 78.813356] },
-      { name: 'EEE Department', location: [10.758069, 78.814663] },
-      { name: 'Mechanical + MME', location: [10.758133, 78.815789] },
-      { name: 'Central Workshop', location: [10.760230, 78.815786] },
-      { name: 'ECE Department', location: [10.760653, 78.816531] },
-      { name: 'Production Department', location: [10.760930, 78.816508] },
-      { name: 'Lyceum Building', location: [10.760060, 78.817655] },
-      { name: 'CSE Department', location: [10.759950, 78.818516] },
+    map.fitBounds(window.routeLine.getBounds(), { padding: [40,40] });
+  }
+});
 
-      { name: 'Agate', location: [10.761820191439163, 78.8154991509259] },
-      { name: 'Garnet A and Garnet B', location: [10.762784197315106, 78.81200397483693] },
-      { name: 'Garnet C', location: [10.762995360090889, 78.81254600747656] },
-      { name: 'Mega Mess 2', location: [10.764627177120556, 78.8131651743623] },
-      { name: 'Amethyst', location: [10.766303500268865, 78.81451722727907] },
-      { name: 'Anapoorna mess and Amber A & B', location: [10.767826228746227, 78.81308136297636] },
-      { name: 'Jasper', location: [10.769508650224616, 78.81780479333487] },
-      { name: 'Sabari Mess and Aquamarine A & B', location: [10.767950856425696, 78.8176685205841] },
-      { name: 'Zircon A,B,C', location: [10.766437995603752, 78.81712882443384] },
-      { name: 'Mega Mess 1', location: [10.765931198921441, 78.8154307282723] },
-      { name: 'CPWD office', location: [10.765260747806485, 78.8171449455854] },
-      { name: 'Sara foods', location: [10.765171002276393, 78.81530175888432] },
-      { name: 'Bru stall and Pearl', location: [10.764126105998558, 78.8154156447789] },
-      { name: 'Ruby', location: [10.764220802264765, 78.81729261831606] },
-      { name: 'Diamond', location: [10.763030275180702, 78.81443611390529] },
-      { name: 'Emerald', location: [10.763129706921545, 78.81641743677193] },
-      { name: 'Jade', location: [10.763194563078569, 78.8178777454143] },
-      { name: 'Beryl', location: [10.761859171863424, 78.81747094878722] },
-      { name: 'Coral', location: [10.761803884263534, 78.81551347372677] },
-      { name: 'Hostel office', location: [10.762332721694602, 78.8143879255767] },
-
-      { name: 'CCD + Domino’s', location: [10.756055, 78.815980] },
-      { name: 'Guest House', location: [10.754095, 78.818933] },
-      { name: 'Temple', location: [10.755352, 78.820742] },
-      { name: 'Opal', location: [10.758631, 78.820618] },
-      { name: '2k Complex', location: [10.760714, 78.818731] },
-      { name: 'ICE Department', location: [10.760672, 78.818495] },
-      { name: 'Anjappar', location: [10.761671, 78.818633] },
-      { name: 'Central Library', location: [10.758196, 78.818055] },
-      { name: 'Swimming Pool', location: [10.758156, 78.817279] },
-      { name: 'Scient Lab', location: [10.757287, 78.816518] },
-      { name: 'Indoor Sports Complex', location: [10.757290, 78.816907] },
-      { name: 'Civil Engineering Department', location: [10.758173, 78.817190] },
-      { name: 'CEDI NITT', location: [10.758230, 78.818063] }
-    ];
-
-    /*******************************************
-     * STOP MARKERS
-     *******************************************/
-    const stopIconUrl = "https://cdn-icons-png.flaticon.com/512/854/854878.png";
-    const stopMarkers = [];
-
-    buggyStops.forEach(s => {
-      const m = L.marker(s.location, {
-        icon: L.icon({ iconUrl: stopIconUrl, iconSize: [30,30] })
-      }).addTo(map).bindPopup(`<b>${s.name}</b>`);
-      stopMarkers.push({ marker: m, data: s });
-    });
-
-    function findStopByName(n) {
-      return buggyStops.find(s => s.name.toLowerCase() === n.toLowerCase());
-    }
-
-    function findNearestStop(lat, lng) {
-      let min = Infinity, best = null;
-      stopMarkers.forEach(s => {
-        const d = map.distance([lat,lng], s.data.location);
-        if (d < min) { min = d; best = s; }
-      });
-      return best;
-    }
-
-    /*******************************************
-     * BUGGY ROUTES (STATIC) ----
-     This section defines the campus path (as a series of map coordinates)
-     that each buggy follows, and these paths are drawn permanently as blue
-     lines on the map for all users to see.
-     *******************************************/
-    const buggyRoutes = {
-      buggy_1: [
-        [10.761750, 78.814649],
-        [10.760368, 78.813970],
-        [10.760230, 78.815786],
-        [10.764126, 78.815415],
-        [10.765171, 78.815302],
-        [10.765931, 78.815431],
-        [10.7663035, 78.8145172]
-      ],
-      buggy_2: [
-        [10.759950, 78.818516],
-        [10.760653, 78.816531],
-        [10.760714, 78.818731],
-        [10.761671, 78.818633],
-        [10.7623327, 78.8143879],
-        [10.76182019, 78.81549915]
-      ]
-    };
-
-    Object.keys(buggyRoutes).forEach(id => {
-      L.polyline(buggyRoutes[id], {
-        color: "#0077ff", weight:3, opacity:0.7
-      }).addTo(map);
-    });
-
-    /*******************************************
-     * BUGGY MARKERS (LIVE)
-     *******************************************/
-    const busIcon = L.icon({
-      iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
-      iconSize: [48,48],
-      iconAnchor: [24,24],
-      className: "buggy-icon"
-    });
-
-    const buggyMarkers = {};
-
-    function rotateIcon(marker, heading) {
-      if (!marker._icon) return;
-      marker._icon.style.transform =
-        `translate(-50%, -50%) rotate(${heading}deg)`;
-    }
-
-    function smoothMove(markerObj, newLatLng) {
-      const marker = markerObj;
-      const start = marker.getLatLng();
-      const end = L.latLng(newLatLng);
-      const steps = 20;
-      let i = 0;
-
-      function animate() {
-        i++;
-        const lat = start.lat + (end.lat - start.lat)*i/steps;
-        const lng = start.lng + (end.lng - start.lng)*i/steps;
-        marker.setLatLng([lat,lng]);
-        if (i < steps) requestAnimationFrame(animate);
-      }
-      animate();
-    }
-
-    db.collection("buggies").onSnapshot(snap => {
-      snap.forEach(doc => {
-        const id = doc.id;
-        const d = doc.data();
-        if (!d.lat || !d.lng) return;
-
-        if (!buggyMarkers[id]) {
-          const mk = L.marker([d.lat,d.lng], { icon: busIcon }).addTo(map);
-          buggyMarkers[id] = mk;
-          rotateIcon(mk, d.heading || 0);
-        } else {
-          smoothMove(buggyMarkers[id], [d.lat,d.lng]);
-          rotateIcon(buggyMarkers[id], d.heading || 0);
-        }
-      });
-    });
-
-    /*******************************************
-     * ROUTING (ORS)
-     *******************************************/
-    async function getRealRoute(from, to) {
-      try {
-        const url =
-          `${ORS_URL}?api_key=${ORS_API_KEY}&start=${from[1]},${from[0]}&end=${to[1]},${to[0]}`;
-
-        const res = await fetch(url);
-        const data = await res.json();
-
-        const coords = data.features[0].geometry.coordinates;
-        const route = coords.map(c => [c[1], c[0]]);
-        const summary = data.features[0].properties.summary;
-
-        return {
-          route,
-          distanceKm: summary.distance/1000,
-          durationMin: summary.duration/60
-        };
-      } catch(err) {
-        console.error(err);
-        return null;
-      }
-    }
-
-    /*******************************************
-     * USER + PICKUP/DROP + REAL ROUTE
-     *******************************************/
-    let CURRENT_UID = null;
-    let userMarker = null;
-    let pickupMarker = null;
-    let dropMarker = null;
-    let userRouteLine = null;
-
-    function clearUserRoute() {
-      if (pickupMarker) map.removeLayer(pickupMarker);
-      if (dropMarker) map.removeLayer(dropMarker);
-      if (userRouteLine) map.removeLayer(userRouteLine);
-    }
-
-    function updateUser(lat,lng,name) {
-      if (!userMarker) {
-        userMarker = L.marker([lat,lng], {
-          icon: L.icon({
-            iconUrl:"https://cdn-icons-png.flaticon.com/512/149/149071.png",
-            iconSize:[40,40]
-          })
-        }).addTo(map).bindPopup(name || CURRENT_UID);
-      } else {
-        smoothMove(userMarker, [lat,lng]);
-      }
-
-      const nearest = findNearestStop(lat,lng);
-      stopMarkers.forEach(s => s.marker._icon.classList.remove("nearest-stop"));
-      nearest.marker._icon.classList.add("nearest-stop");
-    }
-
-    function startUserListener() {
-      db.collection("users").onSnapshot(snap => {
-        snap.forEach(doc => {
-          if (doc.id !== CURRENT_UID) return;
-          const d = doc.data();
-          if (!d.lat || !d.lng) return;
-          updateUser(d.lat, d.lng, d.name);
-        });
-      });
-    }
-
-    async function setPickupDrop(pickName, dropName) {
-      clearUserRoute();
-
-      const pick = findStopByName(pickName);
-      const drop = findStopByName(dropName);
-
-      pickupMarker = L.marker(pick.location).addTo(map);
-      dropMarker = L.marker(drop.location).addTo(map);
-
-      setStatus("Calculating route…");
-
-      const r = await getRealRoute(pick.location, drop.location);
-
-      if (!r) {
-        userRouteLine = L.polyline([pick.location, drop.location],
-          {color:"red",weight:5, dashArray:"6,6"}
-        ).addTo(map);
-        setStatus("Route unavailable");
-        return;
-      }
-
-      userRouteLine = L.polyline(r.route, {color:"red",weight:5}).addTo(map);
-      map.fitBounds(userRouteLine.getBounds(), {padding:[40,40]});
-
-      setStatus(`Route ready — ${r.distanceKm.toFixed(2)} km • ${r.durationMin.toFixed(1)} min`);
-    }
-
-    /*******************************************
-     * THUNKABLE COMMUNICATION
-     *******************************************/
-    window.addEventListener("message", evt => {
-      let data = evt.data;
-      if (typeof data === "string") try { data = JSON.parse(data); } catch(e){}
-
-      if (data.uid) {
-        CURRENT_UID = data.uid;
-        startUserListener();
-      }
-
-      if (data.pickup && data.drop) {
-        setPickupDrop(data.pickup, data.drop);
-      }
-    });
-
-    window.onload = () => {
-      window.parent.postMessage(JSON.stringify({ready:true}), "*");
-      setStatus("Ready — waiting for UID, pickup, drop…");
-    };
+window.onload = () => {
+  window.parent.postMessage(JSON.stringify({ready:true}), "*");
+  setStatus("Ready…");
+};
 </script>
 
 </body>
