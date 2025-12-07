@@ -1,133 +1,30 @@
-<!-- FORCE REBUILD v2 -->
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Buggy Live Map</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Firebase Test</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
-  <style>
-    html, body, #map { height:100%; margin:0; padding:0; }
-    .topbar {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 999;
-      background: rgba(0,0,0,0.85);
-      color: white;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 14px;
-    }
-  </style>
+  <!-- FIREBASE COMPAT -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 
 <body>
+  <h1 id="msg">Checking Firebase...</h1>
 
-<div id="map"></div>
-<div class="topbar" id="status">Connecting to Firebase…</div>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
+      authDomain: "buggy-nitt.firebaseapp.com",
+      databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "buggy-nitt",
+      storageBucket: "buggy-nitt.appspot.com",
+      messagingSenderId: "790523264958",
+      appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
+    };
 
-<!-- Leaflet -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    firebase.initializeApp(firebaseConfig);
 
-<!-- ✅ ✅ ✅ FIREBASE (COMPAT VERSION — 100% SAFE ON GITHUB PAGES) -->
-<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
-
-<script>
-/* ============================
-   ✅ FIREBASE CONFIG
-============================ */
-const firebaseConfig = {
-  apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
-  authDomain: "buggy-nitt.firebaseapp.com",
-  databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "buggy-nitt",
-  storageBucket: "buggy-nitt.firebasestorage.app",
-  messagingSenderId: "790523264958",
-  appId: "1:790523464958:web:b2e42c5e6f0952e2ad83ef"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-/* ============================
-   ✅ MAP
-============================ */
-const map = L.map("map").setView([10.7600, 78.8135], 16);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-
-const statusEl = document.getElementById("status");
-const setStatus = txt => statusEl.textContent = txt;
-
-/* ============================
-   ✅ STATIC STOPS
-============================ */
-const buggyStops = [
-  { name: "Lassi Shop", location: [10.76175, 78.814649] },
-  { name: "CSE Department", location: [10.75995, 78.818516] }
-];
-
-buggyStops.forEach(s => {
-  L.marker(s.location).addTo(map).bindPopup(s.name);
-});
-
-/* ============================
-   ✅ LIVE USERS
-============================ */
-const userMarkers = {};
-
-function updateUser(id, lat, lng, name) {
-  if (!userMarkers[id]) {
-    userMarkers[id] = L.marker([lat, lng]).addTo(map)
-      .bindPopup(name || id);
-  } else {
-    userMarkers[id].setLatLng([lat, lng]);
-  }
-}
-
-db.ref("users").on("value", snap => {
-  snap.forEach(child => {
-    const id = child.key;
-    const d = child.val();
-    if (d.lat && d.lng) {
-      updateUser(id, d.lat, d.lng, d.name);
-    }
-  });
-});
-
-/* ============================
-   ✅ LIVE BUGGIES
-============================ */
-const buggyMarkers = {};
-
-function updateBuggy(id, lat, lng) {
-  if (!buggyMarkers[id]) {
-    buggyMarkers[id] = L.marker([lat, lng]).addTo(map)
-      .bindPopup("Buggy: " + id);
-  } else {
-    buggyMarkers[id].setLatLng([lat, lng]);
-  }
-}
-
-db.ref("buggies").on("value", snap => {
-  snap.forEach(child => {
-    const id = child.key;
-    const d = child.val();
-    if (d.lat && d.lng) {
-      updateBuggy(id, d.lat, d.lng);
-    }
-  });
-});
-
-/* ============================
-   ✅ DONE
-============================ */
-setStatus("✅ Firebase Connected Successfully");
-</script>
-
+    document.getElementById("msg").innerText = "✅ FIREBASE LOADED SUCCESSFULLY";
+  </script>
 </body>
 </html>
