@@ -1,13 +1,89 @@
 <!doctype html>
 <html>
 <head>
-  <title>TEST</title>
-</head>
-<body>
-  <h1 id="t">JS NOT RUNNING</h1>
+  <meta charset="utf-8" />
+  <title>Buggy Live Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <script>
-    document.getElementById("t").innerText = "✅ JavaScript is running!";
-  </script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    .topbar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 999;
+      background: black;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+
+<body>
+<div id="map"></div>
+<div class="topbar" id="status">Starting…</div>
+
+<script type="module">
+
+// ✅ FIREBASE (MODERN SDK)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+// ✅ YOUR CONFIG
+const firebaseConfig = {
+  apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
+  authDomain: "buggy-nitt.firebaseapp.com",
+  databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "buggy-nitt",
+  storageBucket: "buggy-nitt.firebasestorage.app",
+  messagingSenderId: "790523264958",
+  appId: "1:790523464958:web:b2e42c5e6f0952e2ad83ef"
+};
+
+// ✅ INIT
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const statusEl = document.getElementById("status");
+statusEl.innerText = "✅ Firebase Connected!";
+
+// ✅ MAP
+const map = L.map("map").setView([10.7600, 78.8135], 16);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+// ✅ ICON
+const buggyIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
+  iconSize: [40, 40]
+});
+
+const buggyMarkers = {};
+
+// ✅ LIVE BUGGY LISTENER
+const buggyRef = ref(db, "buggies");
+
+onValue(buggyRef, (snapshot) => {
+  const data = snapshot.val();
+  if (!data) return;
+
+  for (const id in data) {
+    const b = data[id];
+
+    if (!buggyMarkers[id]) {
+      buggyMarkers[id] = L.marker([b.lat, b.lng], { icon: buggyIcon })
+        .addTo(map)
+        .bindPopup("Buggy: " + id);
+    } else {
+      buggyMarkers[id].setLatLng([b.lat, b.lng]);
+    }
+  }
+});
+
+</script>
 </body>
 </html>
