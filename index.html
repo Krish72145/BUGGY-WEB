@@ -1,46 +1,13 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Firebase Test</title>
+  <title>TEST</title>
 </head>
 <body>
+  <h1 id="t">JS NOT RUNNING</h1>
 
-<h2 id="status">Connecting to Firebase...</h2>
-
-<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
-
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
-  authDomain: "buggy-nitt.firebaseapp.com",
-  databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "buggy-nitt",
-  storageBucket: "buggy-nitt.firebasestorage.app",
-  messagingSenderId: "790523264958",
-  appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-const status = document.getElementById("status");
-
-db.ref("buggies").once("value")
-  .then(snapshot => {
-    if (snapshot.exists()) {
-      status.innerText = "✅ Firebase CONNECTED successfully!";
-      console.log(snapshot.val());
-    } else {
-      status.innerText = "⚠️ Connected but no data found.";
-    }
-  })
-  .catch(err => {
-    status.innerText = "❌ Firebase ERROR";
-    console.error(err);
-  });
-</script>
-
+  <script>
+    document.getElementById("t").innerText = "✅ JavaScript is running!";
+  </script>
 </body>
 </html>
