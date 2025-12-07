@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <title>NIT Trichy Buggy Live Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
   <style>
@@ -30,17 +29,13 @@
 <div id="map"></div>
 <div class="topbar" id="status">Connecting to Firebase…</div>
 
-<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
 
 <script>
-/* ==============================
-   ✅ YOUR FIREBASE CONFIG
-================================ */
+
+/* ✅ FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
   authDomain: "buggy-nitt.firebaseapp.com",
@@ -48,26 +43,22 @@ const firebaseConfig = {
   projectId: "buggy-nitt",
   storageBucket: "buggy-nitt.firebasestorage.app",
   messagingSenderId: "790523264958",
-  appId: "1:790523464958:web:b2e42c5e6f0952e2ad83ef"
+  appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ==============================
-   ✅ MAP SETUP
-================================ */
+/* ✅ MAP SETUP */
 const map = L.map("map").setView([10.7600, 78.8135], 16);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 const statusEl = document.getElementById("status");
 const setStatus = txt => statusEl.textContent = txt;
 
-/* ==============================
-   ✅ ALL BUGGY STOPS (STATIC)
-================================ */
+/* ✅ BUGGY STOPS */
 const buggyStops = [
-  { name: 'Lassi Shop', location: [10.761750, 78.814649] },
+ { name: 'Lassi Shop', location: [10.761750, 78.814649] },
 { name: 'Coke Station', location: [10.761701, 78.813969] },
 { name: 'GJCH', location: [10.761515, 78.811831] },
 { name: 'Department of Energy and Environment', location: [10.759784, 78.812305] },
@@ -109,8 +100,8 @@ const buggyStops = [
 { name: 'Jade', location: [10.763194563078569, 78.8178777454143] },
 { name: 'Beryl', location: [10.761859171863424, 78.81747094878722] },
 { name: 'Coral', location: [10.761803884263534, 78.81551347372677] },
-{ name: 'Hostel office', location: [10.762332721694602, 78.8143879255767] }
-{ name: 'CCD + Domino’s', location: [10.756055, 78.815980] },
+{ name: 'Hostel office', location: [10.762332721694602, 78.8143879255767] },
+{ name: 'CCD + Dominos', location: [10.756055, 78.815980] },
 { name: 'Guest House', location: [10.754095, 78.818933] },
 { name: 'Temple', location: [10.755352, 78.820742] },
 { name: 'Opal', location: [10.758631, 78.820618] },
@@ -126,14 +117,11 @@ const buggyStops = [
 ];
 
 buggyStops.forEach(s => {
-  L.marker(s.loc).addTo(map).bindPopup(s.name);
+  L.marker(s.location).addTo(map).bindPopup(s.name);
 });
 
-/* ==============================
-   ✅ LIVE USER MARKERS
-================================ */
+/* ✅ USER MARKERS */
 const userMarkers = {};
-
 function updateUser(phone, lat, lng, name) {
   if (!userMarkers[phone]) {
     userMarkers[phone] = L.marker([lat, lng], {
@@ -147,11 +135,8 @@ function updateUser(phone, lat, lng, name) {
   }
 }
 
-/* ==============================
-   ✅ LIVE BUGGY MARKERS
-================================ */
+/* ✅ BUGGY MARKERS */
 const buggyMarkers = {};
-
 function updateBuggy(id, lat, lng) {
   if (!buggyMarkers[id]) {
     buggyMarkers[id] = L.marker([lat, lng], {
@@ -165,11 +150,9 @@ function updateBuggy(id, lat, lng) {
   }
 }
 
-/* ==============================
-   ✅ FIREBASE LISTENERS
-================================ */
+/* ✅ LIVE FIREBASE LISTENERS */
 
-// LIVE USERS
+// USERS
 db.ref("users").on("value", snap => {
   snap.forEach(child => {
     const phone = child.key;
@@ -180,7 +163,7 @@ db.ref("users").on("value", snap => {
   });
 });
 
-// LIVE BUGGIES
+// BUGGIES
 db.ref("buggies").on("value", snap => {
   snap.forEach(child => {
     const id = child.key;
@@ -191,7 +174,7 @@ db.ref("buggies").on("value", snap => {
   });
 });
 
-setStatus("✅ Live Firebase Connected");
+setStatus("✅ Firebase Connected Live");
 
 </script>
 </body>
