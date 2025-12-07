@@ -5,22 +5,17 @@
   <title>NIT Trichy Buggy Live Map</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- ✅ Leaflet CSS -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    html, body, #map {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
     .topbar {
       position: absolute;
       top: 12px;
       left: 12px;
       z-index: 999;
-      background: rgba(0,0,0,0.75);
+      background: rgba(0,0,0,0.85);
       color: white;
       padding: 10px 14px;
       border-radius: 10px;
@@ -30,21 +25,24 @@
 </head>
 
 <body>
-
 <div id="map"></div>
-<div class="topbar" id="status">Connecting to Firebase…</div>
+<div class="topbar" id="status">Loading map…</div>
 
-<!-- ✅ Leaflet -->
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- ✅ Firebase (VERY IMPORTANT ORDER) -->
-<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+<!-- ✅ FIREBASE v9 MODULE (NO GLOBAL firebase ANYMORE) -->
+<script type="module">
 
-<script>
-/* ===========================
-   ✅ FIREBASE CONFIG
-=========================== */
+/* ================================
+   ✅ FIREBASE IMPORTS
+================================ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.24.0/firebase-database.js";
+
+/* ================================
+   ✅ YOUR FIREBASE CONFIG
+================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
   authDomain: "buggy-nitt.firebaseapp.com",
@@ -55,89 +53,82 @@ const firebaseConfig = {
   appId: "1:790523464958:web:b2e42c5e6f0952e2ad83ef"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+/* ================================
+   ✅ INIT FIREBASE
+================================ */
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-/* ===========================
-   ✅ MAP SETUP
-=========================== */
+/* ================================
+   ✅ MAP
+================================ */
 const map = L.map("map").setView([10.7600, 78.8135], 16);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 const statusEl = document.getElementById("status");
 const setStatus = t => statusEl.textContent = t;
 
-/* ===========================
-   ✅ BUGGY STOPS (STATIC)
-=========================== */
+/* ================================
+   ✅ STATIC STOPS
+================================ */
 const buggyStops = [
   { name: "Lassi Shop", location: [10.76175, 78.814649] },
   { name: "CSE Department", location: [10.75995, 78.818516] }
 ];
 
 buggyStops.forEach(s => {
-  L.marker(s.location)
-    .addTo(map)
-    .bindPopup(s.name);
+  L.marker(s.location).addTo(map).bindPopup(s.name);
 });
 
-/* ===========================
+/* ================================
    ✅ LIVE BUGGIES
-=========================== */
+================================ */
 const buggyMarkers = {};
 
 function updateBuggy(id, lat, lng) {
   if (!buggyMarkers[id]) {
-    buggyMarkers[id] = L.marker([lat,lng]).addTo(map)
+    buggyMarkers[id] = L.marker([lat, lng]).addTo(map)
       .bindPopup("Buggy: " + id);
   } else {
-    buggyMarkers[id].setLatLng([lat,lng]);
+    buggyMarkers[id].setLatLng([lat, lng]);
   }
 }
 
-db.ref("buggies").on("value", snap => {
+onValue(ref(db, "buggies"), (snap) => {
   snap.forEach(child => {
     const id = child.key;
     const d = child.val();
-    if (d.lat && d.lng) {
-      updateBuggy(id, d.lat, d.lng);
-    }
+    if (d.lat && d.lng) updateBuggy(id, d.lat, d.lng);
   });
 });
 
-/* ===========================
+/* ================================
    ✅ LIVE USERS
-=========================== */
+================================ */
 const userMarkers = {};
 
 function updateUser(id, lat, lng, name) {
   if (!userMarkers[id]) {
-    userMarkers[id] = L.marker([lat,lng], {
-      icon: L.icon({
-        iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
-        iconSize: [32,32]
-      })
-    }).addTo(map).bindPopup(name || id);
+    userMarkers[id] = L.marker([lat, lng]).addTo(map)
+      .bindPopup(name || id);
   } else {
-    userMarkers[id].setLatLng([lat,lng]);
+    userMarkers[id].setLatLng([lat, lng]);
   }
 }
 
-db.ref("users").on("value", snap => {
+onValue(ref(db, "users"), (snap) => {
   snap.forEach(child => {
     const id = child.key;
     const d = child.val();
-    if (d.lat && d.lng) {
-      updateUser(id, d.lat, d.lng, d.name);
-    }
+    if (d.lat && d.lng) updateUser(id, d.lat, d.lng, d.name);
   });
 });
 
-/* ===========================
+/* ================================
    ✅ STATUS
-=========================== */
+================================ */
 setStatus("✅ Firebase Connected Successfully");
-</script>
 
+</script>
 </body>
 </html>
