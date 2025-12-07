@@ -1,12 +1,11 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>Buggy Live Map</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
     html, body, #map { height:100%; margin:0; padding:0; }
@@ -16,21 +15,17 @@
       position: absolute;
       top: 12px;
       left: 12px;
-      z-index: 999;
-      background: rgba(0,0,0,0.6);
-      padding: 8px 12px;
+      z-index: 1000;
+      background: rgba(0,0,0,0.7);
+      padding: 8px 14px;
       color: white;
       border-radius: 10px;
       font-size: 14px;
     }
   </style>
-
-  <!-- Thunkable Bridge -->
-  <script src="https://thunkable.github.io/webviewer-extension/thunkableWebviewerExtension.js"></script>
 </head>
 
 <body>
-
 <div id="map"></div>
 <div class="topbar" id="status">Connecting to Firebase…</div>
 
@@ -42,9 +37,9 @@
 <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
 
 <script>
-/* =========================
-   ✅ FIREBASE CONFIG (FIXED)
-========================= */
+/* ==============================
+   ✅ FIREBASE CONFIG (YOURS)
+================================ */
 const firebaseConfig = {
   apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
   authDomain: "buggy-nitt.firebaseapp.com",
@@ -58,108 +53,74 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* =========================
-   ✅ MAP SETUP
-========================= */
+/* ==============================
+   ✅ MAP
+================================ */
 const map = L.map("map").setView([10.7600, 78.8135], 16);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 const statusEl = document.getElementById("status");
-const setStatus = t => statusEl.textContent = t;
+const setStatus = txt => statusEl.textContent = txt;
 
-/* =========================
-   ✅ BUGGY STOPS (FIXED)
-========================= */
-const buggyStops = [
-  { name: "Lassi Shop", location: [10.761750, 78.814649] },
-  { name: "Coke Station", location: [10.761701, 78.813969] },
-  { name: "GJCH", location: [10.761515, 78.811831] },
-  { name: "Ojas", location: [10.760575, 78.808483] },
-  { name: "Orion Front", location: [10.759719, 78.811045] },
-  { name: "Capstone", location: [10.759813, 78.814115] },
-  { name: "Admin Building", location: [10.758778, 78.813191] },
-  { name: "Central Workshop", location: [10.760230, 78.815786] },
-  { name: "CSE Department", location: [10.759950, 78.818516] },
-  { name: "Hostel Office", location: [10.762332721694602, 78.8143879255767] },
-  { name: "CCD + Domino’s", location: [10.756055, 78.815980] }
-];
-
-buggyStops.forEach(s => {
-  L.marker(s.location).addTo(map).bindPopup(s.name);
+/* ==============================
+   ✅ ICONS
+================================ */
+const buggyIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
+  iconSize: [42,42],
+  iconAnchor: [21,21]
 });
 
-/* =========================
-   ✅ LIVE USERS
-========================= */
-const userMarkers = {};
+const userIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+  iconSize: [32,32],
+  iconAnchor: [16,16]
+});
 
-function updateUser(phone, lat, lng, name) {
-  if (!userMarkers[phone]) {
-    userMarkers[phone] = L.marker([lat, lng]).addTo(map)
-      .bindPopup(name || phone);
-  } else {
-    userMarkers[phone].setLatLng([lat, lng]);
-  }
-}
-
-/* =========================
+/* ==============================
    ✅ LIVE BUGGIES
-========================= */
+================================ */
 const buggyMarkers = {};
 
-function updateBuggy(id, lat, lng) {
-  if (!buggyMarkers[id]) {
-    buggyMarkers[id] = L.marker([lat, lng]).addTo(map)
-      .bindPopup("Buggy: " + id);
-  } else {
-    buggyMarkers[id].setLatLng([lat, lng]);
-  }
-}
-
-/* =========================
-   ✅ FIREBASE LISTENERS
-========================= */
-
-// USERS
-db.ref("users").on("value", snap => {
-  snap.forEach(child => {
-    const phone = child.key;
-    const d = child.val();
-    if (d.lat && d.lng) {
-      updateUser(phone, d.lat, d.lng, d.name);
-    }
-  });
-});
-
-// BUGGIES
 db.ref("buggies").on("value", snap => {
   snap.forEach(child => {
     const id = child.key;
     const d = child.val();
-    if (d.lat && d.lng) {
-      updateBuggy(id, d.lat, d.lng);
+
+    if (!d.lat || !d.lng) return;
+
+    if (!buggyMarkers[id]) {
+      buggyMarkers[id] = L.marker([d.lat, d.lng], { icon: buggyIcon })
+        .addTo(map)
+        .bindPopup("Buggy: " + id);
+    } else {
+      buggyMarkers[id].setLatLng([d.lat, d.lng]);
     }
   });
+
+  setStatus("✅ Live Firebase Connected");
 });
 
-setStatus("✅ Live Firebase Connected");
+/* ==============================
+   ✅ LIVE USERS
+================================ */
+const userMarkers = {};
 
-/* =========================
-   ✅ THUNKABLE MESSAGE INPUT
-========================= */
-ThunkableWebviewerExtension.receiveMessage(function(message) {
-  let data = message;
-  if (typeof data === "string") {
-    try { data = JSON.parse(data); } catch (_) {}
-  }
+db.ref("users").on("value", snap => {
+  snap.forEach(child => {
+    const phone = child.key;
+    const d = child.val();
 
-  if (data.phone && data.lat && data.lng) {
-    updateUser(data.phone, data.lat, data.lng, data.name);
-  }
+    if (!d.lat || !d.lng) return;
 
-  if (data.buggyId && data.lat && data.lng) {
-    updateBuggy(data.buggyId, data.lat, data.lng);
-  }
+    if (!userMarkers[phone]) {
+      userMarkers[phone] = L.marker([d.lat, d.lng], { icon: userIcon })
+        .addTo(map)
+        .bindPopup(d.name || phone);
+    } else {
+      userMarkers[phone].setLatLng([d.lat, d.lng]);
+    }
+  });
 });
 </script>
 </body>
