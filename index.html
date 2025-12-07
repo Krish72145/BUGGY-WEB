@@ -1,30 +1,25 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Buggy Live Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buggy User Live Map</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Firebase (WORKING COMPAT VERSION) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    html, body, #map { height:100%; margin:0; }
-    #status {
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    .topbar {
       position: absolute;
       top: 12px;
       left: 12px;
       background: black;
       color: white;
-      padding: 8px 14px;
+      padding: 10px 14px;
       border-radius: 10px;
-      z-index: 999;
       font-weight: bold;
+      z-index: 999;
     }
   </style>
 </head>
@@ -32,17 +27,25 @@
 <body>
 
 <div id="map"></div>
-<div id="status">Connecting to Firebase…</div>
+<div class="topbar" id="status">Connecting to Firebase…</div>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- ✅✅✅ CORRECT FIREBASE SCRIPTS (NO MORE ERROR) -->
+<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
 
 <script>
-/* ======================= FIREBASE CONFIG ======================= */
-
+/* =========================
+   ✅ YOUR FIREBASE CONFIG
+========================= */
 const firebaseConfig = {
   apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
   authDomain: "buggy-nitt.firebaseapp.com",
   databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "buggy-nitt",
-  storageBucket: "buggy-nitt.appspot.com",
+  storageBucket: "buggy-nitt.firebasestorage.app",
   messagingSenderId: "790523264958",
   appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
 };
@@ -50,73 +53,139 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ======================= MAP ======================= */
-
+/* =========================
+   ✅ MAP INIT
+========================= */
 const map = L.map("map").setView([10.7600, 78.8135], 16);
-
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-const statusBox = document.getElementById("status");
+const statusEl = document.getElementById("status");
+statusEl.innerText = "✅ Firebase Connected";
 
-/* ======================= ICONS ======================= */
+/* =========================
+   ✅ ICONS
+========================= */
+const userIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+  iconSize: [36, 36]
+});
 
 const buggyIcon = L.icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
-  iconSize: [40,40],
-  iconAnchor: [20,20]
+  iconSize: [44, 44]
 });
 
-const userIcon = L.icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
-  iconSize: [32,32],
-  iconAnchor: [16,16]
-});
+/* =========================
+   ✅ MARKERS
+========================= */
+let userMarker = null;
+let assignedBuggyMarker = null;
 
-/* ======================= LIVE BUGGIES ======================= */
+/* =========================
+   ✅ GET NEAREST BUGGY
+========================= */
+function findNearestBuggy(userLat, userLng, buggies) {
+  let nearestId = null;
+  let nearestDist = Infinity;
 
-const buggyMarkers = {};
+  for (const id in buggies) {
+    const b = buggies[id];
+    const d = map.distance([userLat, userLng], [b.lat, b.lng]);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearestId = id;
+    }
+  }
+  return nearestId;
+}
 
+/* =========================
+   ✅ LIVE USER UPDATE
+========================= */
+function updateUser(phone, name, lat, lng) {
+
+  db.ref("users/" + phone).update({
+    name,
+    phone,
+    lat,
+    lng,
+    status: "waiting"
+  });
+
+  if (!userMarker) {
+    userMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
+  } else {
+    userMarker.setLatLng([lat, lng]);
+  }
+}
+
+/* =========================
+   ✅ AUTO ASSIGN NEAREST BUGGY
+========================= */
 db.ref("buggies").on("value", snap => {
-  snap.forEach(child => {
-    const id = child.key;
-    const d = child.val();
+  snap.once("value").then(bugSnap => {
+    if (!currentUser) return;
 
-    if (!d.lat || !d.lng) return;
+    const buggies = bugSnap.val();
+    const nearestBuggy = findNearestBuggy(
+      currentUser.lat,
+      currentUser.lng,
+      buggies
+    );
 
-    if (!buggyMarkers[id]) {
-      buggyMarkers[id] = L.marker([d.lat, d.lng], { icon: buggyIcon })
-        .addTo(map)
-        .bindPopup("Buggy: " + id);
-    } else {
-      buggyMarkers[id].setLatLng([d.lat, d.lng]);
+    if (nearestBuggy) {
+      db.ref("users/" + currentUser.phone + "/assignedBuggy").set(nearestBuggy);
     }
   });
-
-  statusBox.innerText = "✅ Buggy Live Tracking Active";
 });
 
-/* ======================= LIVE USERS ======================= */
-
-const userMarkers = {};
-
+/* =========================
+   ✅ TRACK ONLY ASSIGNED BUGGY
+========================= */
 db.ref("users").on("value", snap => {
-  snap.forEach(child => {
-    const phone = child.key;
-    const d = child.val();
+  if (!currentUser) return;
 
-    if (!d.lat || !d.lng) return;
+  const user = snap.child(currentUser.phone).val();
+  if (!user || !user.assignedBuggy) return;
 
-    if (!userMarkers[phone]) {
-      userMarkers[phone] = L.marker(
-        [d.lat, d.lng],
-        { icon: userIcon }
-      ).addTo(map).bindPopup(d.name || phone);
+  const buggyId = user.assignedBuggy;
+
+  db.ref("buggies/" + buggyId).on("value", buggySnap => {
+    const buggy = buggySnap.val();
+    if (!buggy) return;
+
+    if (!assignedBuggyMarker) {
+      assignedBuggyMarker = L.marker(
+        [buggy.lat, buggy.lng],
+        { icon: buggyIcon }
+      ).addTo(map).bindPopup("Your Buggy");
     } else {
-      userMarkers[phone].setLatLng([d.lat, d.lng]);
+      assignedBuggyMarker.setLatLng([buggy.lat, buggy.lng]);
     }
   });
 });
 
+/* =========================
+   ✅ RECEIVE FROM THUNKABLE
+========================= */
+let currentUser = null;
+
+window.addEventListener("message", event => {
+  const data = typeof event.data === "string"
+    ? JSON.parse(event.data)
+    : event.data;
+
+  if (!data.phone || !data.lat || !data.lng) return;
+
+  currentUser = data;
+
+  updateUser(
+    data.phone,
+    data.name || "User",
+    Number(data.lat),
+    Number(data.lng)
+  );
+});
 </script>
 
 </body>
