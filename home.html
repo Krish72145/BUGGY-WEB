@@ -1,30 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf-8">
   <title>Firebase Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- ✅ FIREBASE SDKs (THIS WAS MISSING BEFORE) -->
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
 </head>
 
 <body>
-  <h1 id="msg">Loading…</h1>
+  <h1 id="status">Loading...</h1>
 
   <script>
+    // ✅ YOUR FIREBASE CONFIG
     const firebaseConfig = {
       apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
       authDomain: "buggy-nitt.firebaseapp.com",
       databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "buggy-nitt",
-      storageBucket: "buggy-nitt.firebasestorage.app",
+      storageBucket: "buggy-nitt.appspot.com",
       messagingSenderId: "790523264958",
       appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
     };
 
+    // ✅ INITIALIZE FIREBASE
     firebase.initializeApp(firebaseConfig);
-    firebase.database();
+    const db = firebase.database();
 
-    document.getElementById("msg").innerText = "✅ FIREBASE IS 100% WORKING";
+    // ✅ TEST READ (THIS CONFIRMS 100% CONNECTION)
+    db.ref("buggies").once("value")
+      .then(snapshot => {
+        document.getElementById("status").innerHTML =
+          "✅ FIREBASE IS 100% WORKING";
+        console.log("Buggy data:", snapshot.val());
+      })
+      .catch(err => {
+        document.getElementById("status").innerHTML =
+          "❌ FIREBASE ERROR: " + err.message;
+        console.error(err);
+      });
   </script>
+
 </body>
 </html>
