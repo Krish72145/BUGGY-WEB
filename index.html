@@ -1,40 +1,31 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>Buggy Live Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8" />
+<title>Buggy Live Map</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-    .topbar {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 999;
-      background: black;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 8px;
-    }
-  </style>
+<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
+
+<script src="https://thunkable.github.io/webviewer-extension/thunkableWebviewerExtension.js"></script>
+
+<style>
+html,body,#map{height:100%;margin:0}
+.topbar{position:absolute;top:10px;left:10px;z-index:999;background:black;color:white;padding:8px 12px;border-radius:10px}
+.nearest{transform:scale(1.4)}
+</style>
 </head>
 
 <body>
 <div id="map"></div>
-<div class="topbar" id="status">Starting…</div>
+<div class="topbar" id="status">Connecting to Firebase...</div>
 
-<script type="module">
-
-// ✅ FIREBASE (MODERN SDK)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-// ✅ YOUR CONFIG
+<script>
+// ---------------- FIREBASE ----------------
 const firebaseConfig = {
   apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
   authDomain: "buggy-nitt.firebaseapp.com",
@@ -45,45 +36,114 @@ const firebaseConfig = {
   appId: "1:790523464958:web:b2e42c5e6f0952e2ad83ef"
 };
 
-// ✅ INIT
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-const statusEl = document.getElementById("status");
-statusEl.innerText = "✅ Firebase Connected!";
-
-// ✅ MAP
-const map = L.map("map").setView([10.7600, 78.8135], 16);
+// ---------------- MAP ----------------
+const map = L.map("map").setView([10.7600,78.8135],16);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+const statusEl = document.getElementById("status");
 
-// ✅ ICON
-const buggyIcon = L.icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
-  iconSize: [40, 40]
+// ---------------- ICONS ----------------
+const stopIcon = L.icon({iconUrl:"https://cdn-icons-png.flaticon.com/512/854/854878.png",iconSize:[28,28]});
+const buggyIcon = L.icon({iconUrl:"https://cdn-icons-png.flaticon.com/512/61/61214.png",iconSize:[42,42]});
+const userIcon  = L.icon({iconUrl:"https://cdn-icons-png.flaticon.com/512/149/149071.png",iconSize:[34,34]});
+
+// ---------------- STOPS ----------------
+const buggyStops = [
+{ name:"Lassi Shop", location:[10.76175,78.814649]},
+{ name:"Coke Station", location:[10.761701,78.813969]},
+{ name:"GJCH", location:[10.761515,78.811831]},
+{ name:"CSE Department", location:[10.75995,78.818516]},
+{ name:"Opal", location:[10.758631,78.820618]},
+{ name:"Central Library", location:[10.758196,78.818055]}
+];
+
+const stopMarkers=[];
+buggyStops.forEach(s=>{
+  const m=L.marker(s.location,{icon:stopIcon}).addTo(map).bindPopup(s.name);
+  stopMarkers.push({marker:m,data:s});
 });
 
-const buggyMarkers = {};
+// ---------------- LIVE BUGGIES ----------------
+const buggyMarkers={};
+db.ref("buggies").on("value",snap=>{
+  snap.forEach(child=>{
+    const id=child.key;
+    const d=child.val();
+    if(!d.lat || !d.lng) return;
 
-// ✅ LIVE BUGGY LISTENER
-const buggyRef = ref(db, "buggies");
-
-onValue(buggyRef, (snapshot) => {
-  const data = snapshot.val();
-  if (!data) return;
-
-  for (const id in data) {
-    const b = data[id];
-
-    if (!buggyMarkers[id]) {
-      buggyMarkers[id] = L.marker([b.lat, b.lng], { icon: buggyIcon })
-        .addTo(map)
-        .bindPopup("Buggy: " + id);
+    if(!buggyMarkers[id]){
+      buggyMarkers[id]=L.marker([d.lat,d.lng],{icon:buggyIcon}).addTo(map).bindPopup(id);
     } else {
-      buggyMarkers[id].setLatLng([b.lat, b.lng]);
+      buggyMarkers[id].setLatLng([d.lat,d.lng]);
     }
+  });
+});
+
+// ---------------- LIVE USERS ----------------
+const userMarkers={};
+db.ref("users").on("value",snap=>{
+  snap.forEach(child=>{
+    const phone=child.key;
+    const d=child.val();
+    if(!d.lat || !d.lng) return;
+
+    if(!userMarkers[phone]){
+      userMarkers[phone]=L.marker([d.lat,d.lng],{icon:userIcon}).addTo(map).bindPopup(d.name || phone);
+    } else {
+      userMarkers[phone].setLatLng([d.lat,d.lng]);
+    }
+
+    highlightNearest(d.lat,d.lng);
+  });
+});
+
+// ---------------- NEAREST STOP ----------------
+function highlightNearest(lat,lng){
+  let best=null,min=Infinity;
+  stopMarkers.forEach(s=>{
+    const d=map.distance([lat,lng],s.data.location);
+    if(d<min){min=d;best=s;}
+    s.marker._icon.classList.remove("nearest");
+  });
+  if(best) best.marker._icon.classList.add("nearest");
+}
+
+// ---------------- ROUTING ----------------
+const OSRM="https://router.project-osrm.org/route/v1/driving/";
+
+async function drawRoute(from,to){
+  const url=`${OSRM}${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+  try{
+    const res=await fetch(url);
+    const data=await res.json();
+    const pts=data.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+    L.polyline(pts,{color:"blue",weight:5}).addTo(map);
+    map.fitBounds(pts);
+  }catch{
+    L.polyline([from,to],{color:"red",dashArray:"6,6"}).addTo(map);
+  }
+}
+
+// ---------------- THUNKABLE COMM ----------------
+function sendToThunkable(data){
+  const msg=JSON.stringify(data);
+  if(ThunkableWebviewerExtension) ThunkableWebviewerExtension.postMessage(msg);
+}
+
+ThunkableWebviewerExtension.receiveMessage(function(msg){
+  let data = JSON.parse(msg);
+  if(data.lat && data.lng){
+    highlightNearest(data.lat,data.lng);
+  }
+  if(data.pickup && data.drop){
+    drawRoute(data.pickup,data.drop);
   }
 });
 
+// ---------------- READY ----------------
+statusEl.textContent="✅ Firebase Connected!";
 </script>
 </body>
 </html>
