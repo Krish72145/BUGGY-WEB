@@ -1,46 +1,50 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>NIT Trichy Buggy Live Map</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <!-- ✅ Leaflet CSS -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    html, body, #map { height:100%; margin:0; padding:0; }
-    body { font-family: system-ui, Arial, sans-serif; }
-
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
     .topbar {
       position: absolute;
       top: 12px;
       left: 12px;
       z-index: 999;
-      background: rgba(0,0,0,0.7);
-      padding: 8px 12px;
+      background: rgba(0,0,0,0.75);
       color: white;
+      padding: 10px 14px;
       border-radius: 10px;
       font-size: 14px;
     }
   </style>
 </head>
+
 <body>
 
 <div id="map"></div>
 <div class="topbar" id="status">Connecting to Firebase…</div>
 
-<!-- ✅ LEAFLET -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- ✅ Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- ✅ FIREBASE (MUST LOAD FIRST) -->
+<!-- ✅ Firebase (VERY IMPORTANT ORDER) -->
 <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
 
 <script>
-/* ==============================
-   ✅ YOUR FIREBASE CONFIG
-================================ */
+/* ===========================
+   ✅ FIREBASE CONFIG
+=========================== */
 const firebaseConfig = {
   apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
   authDomain: "buggy-nitt.firebaseapp.com",
@@ -48,75 +52,46 @@ const firebaseConfig = {
   projectId: "buggy-nitt",
   storageBucket: "buggy-nitt.firebasestorage.app",
   messagingSenderId: "790523264958",
-  appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
+  appId: "1:790523464958:web:b2e42c5e6f0952e2ad83ef"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ✅ CONNECTION STATUS */
-const statusEl = document.getElementById("status");
-db.ref(".info/connected").on("value", snap => {
-  if (snap.val() === true) {
-    statusEl.textContent = "✅ Firebase Connected!";
-  } else {
-    statusEl.textContent = "⚠ Firebase Disconnected";
-  }
-});
-
-/* ==============================
+/* ===========================
    ✅ MAP SETUP
-================================ */
+=========================== */
 const map = L.map("map").setView([10.7600, 78.8135], 16);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-/* ==============================
-   ✅ BUGGY STOPS
-================================ */
+const statusEl = document.getElementById("status");
+const setStatus = t => statusEl.textContent = t;
+
+/* ===========================
+   ✅ BUGGY STOPS (STATIC)
+=========================== */
 const buggyStops = [
-  { name: 'Lassi Shop', location: [10.761750, 78.814649] },
-  { name: 'Coke Station', location: [10.761701, 78.813969] },
-  { name: 'Admin Building', location: [10.758778, 78.813191] },
-  { name: 'CSE Department', location: [10.759950, 78.818516] }
+  { name: "Lassi Shop", location: [10.76175, 78.814649] },
+  { name: "CSE Department", location: [10.75995, 78.818516] }
 ];
 
 buggyStops.forEach(s => {
-  L.marker(s.location).addTo(map).bindPopup(s.name);
+  L.marker(s.location)
+    .addTo(map)
+    .bindPopup(s.name);
 });
 
-/* ==============================
-   ✅ LIVE USER MARKERS
-================================ */
-const userMarkers = {};
-
-function updateUser(phone, lat, lng, name) {
-  if (!userMarkers[phone]) {
-    userMarkers[phone] = L.marker([lat, lng]).addTo(map)
-      .bindPopup(name || phone);
-  } else {
-    userMarkers[phone].setLatLng([lat, lng]);
-  }
-}
-
-db.ref("users").on("value", snap => {
-  snap.forEach(child => {
-    const phone = child.key;
-    const d = child.val();
-    if (d.lat && d.lng) updateUser(phone, d.lat, d.lng, d.name);
-  });
-});
-
-/* ==============================
-   ✅ LIVE BUGGY MARKERS
-================================ */
+/* ===========================
+   ✅ LIVE BUGGIES
+=========================== */
 const buggyMarkers = {};
 
 function updateBuggy(id, lat, lng) {
   if (!buggyMarkers[id]) {
-    buggyMarkers[id] = L.marker([lat, lng]).addTo(map)
+    buggyMarkers[id] = L.marker([lat,lng]).addTo(map)
       .bindPopup("Buggy: " + id);
   } else {
-    buggyMarkers[id].setLatLng([lat, lng]);
+    buggyMarkers[id].setLatLng([lat,lng]);
   }
 }
 
@@ -124,10 +99,45 @@ db.ref("buggies").on("value", snap => {
   snap.forEach(child => {
     const id = child.key;
     const d = child.val();
-    if (d.lat && d.lng) updateBuggy(id, d.lat, d.lng);
+    if (d.lat && d.lng) {
+      updateBuggy(id, d.lat, d.lng);
+    }
   });
 });
 
+/* ===========================
+   ✅ LIVE USERS
+=========================== */
+const userMarkers = {};
+
+function updateUser(id, lat, lng, name) {
+  if (!userMarkers[id]) {
+    userMarkers[id] = L.marker([lat,lng], {
+      icon: L.icon({
+        iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+        iconSize: [32,32]
+      })
+    }).addTo(map).bindPopup(name || id);
+  } else {
+    userMarkers[id].setLatLng([lat,lng]);
+  }
+}
+
+db.ref("users").on("value", snap => {
+  snap.forEach(child => {
+    const id = child.key;
+    const d = child.val();
+    if (d.lat && d.lng) {
+      updateUser(id, d.lat, d.lng, d.name);
+    }
+  });
+});
+
+/* ===========================
+   ✅ STATUS
+=========================== */
+setStatus("✅ Firebase Connected Successfully");
 </script>
+
 </body>
 </html>
