@@ -1,181 +1,238 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>NIT Trichy Buggy Live Map</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <meta charset="utf-8" />
+  <title>Buggy Map</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
 
   <style>
-    html, body, #map { height:100%; margin:0; padding:0; }
-    body { font-family: system-ui, Arial, sans-serif; }
-
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+    body {
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    }
     .topbar {
       position: absolute;
-      top: 12px;
-      left: 12px;
       z-index: 999;
+      top: 10px;
+      left: 10px;
       background: rgba(0,0,0,0.6);
-      padding: 8px 12px;
-      color: white;
-      border-radius: 10px;
-      font-size: 14px;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 13px;
     }
   </style>
+
+  <!-- Thunkable WebViewer Extension (for later) -->
+  <script
+    src="https://thunkable.github.io/webviewer-extension/thunkableWebviewerExtension.js"
+    type="text/javascript">
+  </script>
 </head>
-
 <body>
-
 <div id="map"></div>
-<div class="topbar" id="status">Connecting to Firebase…</div>
+<div id="status" class="topbar">Connecting to Firebase…</div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  crossorigin="">
+</script>
+
+<!-- Firebase (app + database compat) -->
 <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-database-compat.js"></script>
 
 <script>
+  /*****************************************
+   * 1. FIREBASE CONFIG
+   *****************************************/
+  const firebaseConfig = {
+    apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
+    authDomain: "buggy-nitt.firebaseapp.com",
+    databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "buggy-nitt",
+    storageBucket: "buggy-nitt.firebasestorage.app",
+    messagingSenderId: "790523264958",
+    appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
+  };
 
-/* ✅ FIREBASE CONFIG */
-const firebaseConfig = {
-  apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
-  authDomain: "buggy-nitt.firebaseapp.com",
-  databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "buggy-nitt",
-  storageBucket: "buggy-nitt.firebasestorage.app",
-  messagingSenderId: "790523264958",
-  appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
-};
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+  const statusEl = document.getElementById("status");
+  const setStatus = (txt) => statusEl.textContent = txt;
 
-/* ✅ MAP SETUP */
-const map = L.map("map").setView([10.7600, 78.8135], 16);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+  /*****************************************
+   * 2. LEAFLET MAP SETUP
+   *****************************************/
+  const map = L.map("map", { zoomControl: false })
+    .setView([10.7600, 78.8135], 16);
 
-const statusEl = document.getElementById("status");
-const setStatus = txt => statusEl.textContent = txt;
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19
+  }).addTo(map);
 
-/* ✅ BUGGY STOPS */
-const buggyStops = [
- { name: 'Lassi Shop', location: [10.761750, 78.814649] },
-{ name: 'Coke Station', location: [10.761701, 78.813969] },
-{ name: 'GJCH', location: [10.761515, 78.811831] },
-{ name: 'Department of Energy and Environment', location: [10.759784, 78.812305] },
-{ name: 'Orion Front', location: [10.759719, 78.811045] },
-{ name: 'Department of Chemical Engineering', location: [10.758623, 78.811988] },
-{ name: 'Ojas', location: [10.760575, 78.808483] },
-{ name: 'Department of Architecture', location: [10.759830, 78.809708] },
-{ name: 'Orion Back', location: [10.759701, 78.810454] },
-{ name: 'Third I + Twinnet', location: [10.761183,80.814282] },
-{ name: 'Logos', location: [10.761034, 78.814223] },
-{ name: 'Classics + CEESAT Ground', location: [10.760368, 78.813970] },
-{ name: 'Capstone', location: [10.759813, 78.814115] },
-{ name: 'Barn Hall', location: [10.759214, 78.814188] },
-{ name: 'Admin Building', location: [10.758778, 78.813191] },
-{ name: 'Admin Building Gate', location: [10.758091, 78.813356] },
-{ name: 'EEE Department', location: [10.758069, 78.814663] },
-{ name: 'Mechanical + MME', location: [10.758133, 78.815789] },
-{ name: 'Central Workshop', location: [10.760230, 78.815786] },
-{ name: 'ECE Department', location: [10.760653, 78.816531] },
-{ name: 'Production Department', location: [10.760930, 78.816508] },
-{ name: 'Lyceum Building', location: [10.760060, 78.817655] },
-{ name: 'CSE Department', location: [10.759950, 78.818516] },
-{ name: 'Agate', location: [10.761820191439163, 78.8154991509259] },
-{ name: 'Garnet A and Garnet B', location: [10.762784197315106, 78.81200397483693] },
-{ name: 'Garnet C', location: [10.762995360090889, 78.81254600747656] },
-{ name: 'Mega Mess 2', location: [10.764627177120556, 78.8131651743623] },
-{ name: 'Amethyst', location: [10.766303500268865, 78.81451722727907] },
-{ name: 'Anapoorna mess and Amber A & B', location: [10.767826228746227, 78.81308136297636] },
-{ name: 'Jasper', location: [10.769508650224616, 78.81780479333487] },
-{ name: 'Sabari Mess and Aquamarine A & B', location: [10.767950856425696, 78.8176685205841] },
-{ name: 'Zircon A,B,C', location: [10.766437995603752, 78.81712882443384] },
-{ name: 'Mega Mess 1', location: [10.765931198921441, 78.8154307282723] },
-{ name: 'CPWD office', location: [10.765260747806485, 78.8171449455854] },
-{ name: 'Sara foods', location: [10.765171002276393, 78.81530175888432] },
-{ name: 'Bru stall and Pearl', location: [10.764126105998558, 78.8154156447789] },
-{ name: 'Ruby', location: [10.764220802264765, 78.81729261831606] },
-{ name: 'Diamond', location: [10.763030275180702, 78.81443611390529] },
-{ name: 'Emerald', location: [10.763129706921545, 78.81641743677193] },
-{ name: 'Jade', location: [10.763194563078569, 78.8178777454143] },
-{ name: 'Beryl', location: [10.761859171863424, 78.81747094878722] },
-{ name: 'Coral', location: [10.761803884263534, 78.81551347372677] },
-{ name: 'Hostel office', location: [10.762332721694602, 78.8143879255767] },
-{ name: 'CCD + Dominos', location: [10.756055, 78.815980] },
-{ name: 'Guest House', location: [10.754095, 78.818933] },
-{ name: 'Temple', location: [10.755352, 78.820742] },
-{ name: 'Opal', location: [10.758631, 78.820618] },
-{ name: '2k Complex', location: [10.760714, 78.818731] },
-{ name: 'ICE Department', location: [10.760672, 78.818495] },
-{ name: 'Anjappar', location: [10.761671, 78.818633] },
-{ name: 'Central Library', location: [10.758196, 78.818055] },
-{ name: 'Swimming Pool', location: [10.758156, 78.817279] },
-{ name: 'Scient Lab', location: [10.757287, 78.816518] },
-{ name: 'Indoor Sports Complex', location: [10.757290, 78.816907] },
-{ name: 'Civil Engineering Department', location: [10.758173, 78.817190] },
-{ name: 'CEDI NITT', location: [10.758230, 78.818063] }
-];
-
-buggyStops.forEach(s => {
-  L.marker(s.location).addTo(map).bindPopup(s.name);
-});
-
-/* ✅ USER MARKERS */
-const userMarkers = {};
-function updateUser(phone, lat, lng, name) {
-  if (!userMarkers[phone]) {
-    userMarkers[phone] = L.marker([lat, lng], {
-      icon: L.icon({
-        iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
-        iconSize: [36,36]
-      })
-    }).addTo(map).bindPopup(name || phone);
-  } else {
-    userMarkers[phone].setLatLng([lat, lng]);
-  }
-}
-
-/* ✅ BUGGY MARKERS */
-const buggyMarkers = {};
-function updateBuggy(id, lat, lng) {
-  if (!buggyMarkers[id]) {
-    buggyMarkers[id] = L.marker([lat, lng], {
-      icon: L.icon({
-        iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
-        iconSize: [44,44]
-      })
-    }).addTo(map).bindPopup("Buggy: " + id);
-  } else {
-    buggyMarkers[id].setLatLng([lat, lng]);
-  }
-}
-
-/* ✅ LIVE FIREBASE LISTENERS */
-
-// USERS
-db.ref("users").on("value", snap => {
-  snap.forEach(child => {
-    const phone = child.key;
-    const d = child.val();
-    if (d.lat && d.lng) {
-      updateUser(phone, d.lat, d.lng, d.name);
-    }
+  /*****************************************
+   * 3. ICONS
+   *****************************************/
+  const stopIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+    iconSize: [26, 26],
+    iconAnchor: [13, 13]
   });
-});
 
-// BUGGIES
-db.ref("buggies").on("value", snap => {
-  snap.forEach(child => {
-    const id = child.key;
-    const d = child.val();
-    if (d.lat && d.lng) {
-      updateBuggy(id, d.lat, d.lng);
-    }
+  const buggyIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
   });
-});
 
-setStatus("✅ Firebase Connected Live");
+  const userIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
+  });
 
+  /*****************************************
+   * 4. STATIC BUGGY STOPS
+   *****************************************/
+  const buggyStops = [
+    { name: 'Lassi Shop', location: [10.761750, 78.814649] },
+    { name: 'Coke Station', location: [10.761701, 78.813969] },
+    { name: 'GJCH', location: [10.761515, 78.811831] },
+    { name: 'Department of Energy and Environment', location: [10.759784, 78.812305] },
+    { name: 'Orion Front', location: [10.759719, 78.811045] },
+    { name: 'Department of Chemical Engineering', location: [10.758623, 78.811988] },
+    { name: 'Ojas', location: [10.760575, 78.808483] },
+    { name: 'Department of Architecture', location: [10.759830, 78.809708] },
+    { name: 'Orion Back', location: [10.759701, 78.810454] },
+    { name: 'Third I + Twinnet', location: [10.761183, 78.814282] },
+    { name: 'Logos', location: [10.761034, 78.814223] },
+    { name: 'Classics + CEESAT Ground', location: [10.760368, 78.813970] },
+    { name: 'Capstone', location: [10.759813, 78.814115] },
+    { name: 'Barn Hall', location: [10.759214, 78.814188] },
+    { name: 'Admin Building', location: [10.758778, 78.813191] },
+    { name: 'Admin Building Gate', location: [10.758091, 78.813356] },
+    { name: 'EEE Department', location: [10.758069, 78.814663] },
+    { name: 'Mechanical + MME', location: [10.758133, 78.815789] },
+    { name: 'Central Workshop', location: [10.760230, 78.815786] },
+    { name: 'ECE Department', location: [10.760653, 78.816531] },
+    { name: 'Production Department', location: [10.760930, 78.816508] },
+    { name: 'Lyceum Building', location: [10.760060, 78.817655] },
+    { name: 'CSE Department', location: [10.759950, 78.818516] },
+    // … add remaining hostels / other stops if you want
+  ];
+
+  buggyStops.forEach(s => {
+    L.marker(s.location, { icon: stopIcon })
+      .addTo(map)
+      .bindPopup(s.name);
+  });
+
+  /*****************************************
+   * 5. LIVE BUGGIES FROM FIREBASE
+   *****************************************/
+  const buggyMarkers = {};  // id -> Leaflet marker
+
+  function updateBuggyMarker(id, lat, lng) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    if (!buggyMarkers[id]) {
+      buggyMarkers[id] = L.marker([lat, lng], { icon: buggyIcon })
+        .addTo(map)
+        .bindPopup("Buggy: " + id);
+    } else {
+      buggyMarkers[id].setLatLng([lat, lng]);
+    }
+  }
+
+  db.ref("buggies").on("value", snap => {
+    const val = snap.val() || {};
+    Object.keys(val).forEach(id => {
+      const b = val[id];
+      updateBuggyMarker(id, Number(b.lat), Number(b.lng));
+    });
+    setStatus("✅ Connected (buggies & users live)");
+  });
+
+  /*****************************************
+   * 6. LIVE USERS / PASSENGERS FROM FIREBASE
+   *****************************************/
+  const userMarkers = {};   // phone -> Leaflet marker
+
+  function updateUserMarker(phone, lat, lng, name) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const label = name || phone;
+    if (!userMarkers[phone]) {
+      userMarkers[phone] = L.marker([lat, lng], { icon: userIcon })
+        .addTo(map)
+        .bindPopup(label);
+    } else {
+      userMarkers[phone].setLatLng([lat, lng]);
+      userMarkers[phone].bindPopup(label);
+    }
+  }
+
+  db.ref("users").on("value", snap => {
+    const val = snap.val() || {};
+    Object.keys(val).forEach(phone => {
+      const u = val[phone];
+      if (u.lat != null && u.lng != null) {
+        updateUserMarker(
+          phone,
+          Number(u.lat),
+          Number(u.lng),
+          u.name
+        );
+      }
+    });
+  });
+
+  /*****************************************
+   * 7. THUNKABLE BRIDGE (OPTIONAL)
+   *    — only to know "who am I"
+   *****************************************/
+  let currentPhone = null;
+
+  function setupThunkableBridge() {
+    if (typeof ThunkableWebviewerExtension !== "undefined") {
+      ThunkableWebviewerExtension.receiveMessage(msg => {
+        // Expecting something like: {"phone":"9876543210","role":"user"}
+        try {
+          const data = JSON.parse(msg);
+          if (data.phone) {
+            currentPhone = String(data.phone);
+          }
+        } catch (e) {
+          console.error("Invalid message from Thunkable", e);
+        }
+      });
+    } else {
+      // Fallback for browser testing
+      window.addEventListener("message", ev => {
+        let data = ev.data;
+        if (typeof data === "string") {
+          try { data = JSON.parse(data); } catch(e){ return; }
+        }
+        if (data.phone) currentPhone = String(data.phone);
+      });
+    }
+  }
+
+  setupThunkableBridge();
 </script>
 </body>
 </html>
