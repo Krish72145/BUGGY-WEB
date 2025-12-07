@@ -1,30 +1,123 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Firebase Test</title>
+  <meta charset="utf-8">
+  <title>Buggy Live Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- FIREBASE COMPAT -->
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Firebase (WORKING COMPAT VERSION) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    html, body, #map { height:100%; margin:0; }
+    #status {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: black;
+      color: white;
+      padding: 8px 14px;
+      border-radius: 10px;
+      z-index: 999;
+      font-weight: bold;
+    }
+  </style>
 </head>
 
 <body>
-  <h1 id="msg">Checking Firebase...</h1>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
-      authDomain: "buggy-nitt.firebaseapp.com",
-      databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "buggy-nitt",
-      storageBucket: "buggy-nitt.appspot.com",
-      messagingSenderId: "790523264958",
-      appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
-    };
+<div id="map"></div>
+<div id="status">Connecting to Firebase…</div>
 
-    firebase.initializeApp(firebaseConfig);
+<script>
+/* ======================= FIREBASE CONFIG ======================= */
 
-    document.getElementById("msg").innerText = "✅ FIREBASE LOADED SUCCESSFULLY";
-  </script>
+const firebaseConfig = {
+  apiKey: "AIzaSyANpjWBgnG7Dw0dQFdsmbcw5et5oT-6cxQ",
+  authDomain: "buggy-nitt.firebaseapp.com",
+  databaseURL: "https://buggy-nitt-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "buggy-nitt",
+  storageBucket: "buggy-nitt.appspot.com",
+  messagingSenderId: "790523264958",
+  appId: "1:790523264958:web:b2e42c5e6f0952e2ad83ef"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ======================= MAP ======================= */
+
+const map = L.map("map").setView([10.7600, 78.8135], 16);
+
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+const statusBox = document.getElementById("status");
+
+/* ======================= ICONS ======================= */
+
+const buggyIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61214.png",
+  iconSize: [40,40],
+  iconAnchor: [20,20]
+});
+
+const userIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+  iconSize: [32,32],
+  iconAnchor: [16,16]
+});
+
+/* ======================= LIVE BUGGIES ======================= */
+
+const buggyMarkers = {};
+
+db.ref("buggies").on("value", snap => {
+  snap.forEach(child => {
+    const id = child.key;
+    const d = child.val();
+
+    if (!d.lat || !d.lng) return;
+
+    if (!buggyMarkers[id]) {
+      buggyMarkers[id] = L.marker([d.lat, d.lng], { icon: buggyIcon })
+        .addTo(map)
+        .bindPopup("Buggy: " + id);
+    } else {
+      buggyMarkers[id].setLatLng([d.lat, d.lng]);
+    }
+  });
+
+  statusBox.innerText = "✅ Buggy Live Tracking Active";
+});
+
+/* ======================= LIVE USERS ======================= */
+
+const userMarkers = {};
+
+db.ref("users").on("value", snap => {
+  snap.forEach(child => {
+    const phone = child.key;
+    const d = child.val();
+
+    if (!d.lat || !d.lng) return;
+
+    if (!userMarkers[phone]) {
+      userMarkers[phone] = L.marker(
+        [d.lat, d.lng],
+        { icon: userIcon }
+      ).addTo(map).bindPopup(d.name || phone);
+    } else {
+      userMarkers[phone].setLatLng([d.lat, d.lng]);
+    }
+  });
+});
+
+</script>
+
 </body>
 </html>
